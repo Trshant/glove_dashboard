@@ -1,0 +1,17 @@
+<details>
+  <summary>Elastic Query</summary>
+  <pre>
+    {{query}}
+  </pre>
+</details>
+
+<hr />
+
+<details>
+  <summary>Total Number Of Results : {{total}}</summary>
+{% for item in data %}
+<article data-theme="dark">
+    <p>{{item.content}}</p>
+</article>
+{% endfor %}
+</details>
