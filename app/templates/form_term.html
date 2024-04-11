@@ -1,4 +1,9 @@
-<form hx-post="/submit-search" hx-target="#search-response" hx-trigger="change delay:1s">
+<details open>
+  <summary>Refine Terms</summary>
+<form hx-post="/submit-search" hx-target="#response" hx-trigger="change delay:1s">
+  <label role="group">
+    <input type="range" min="10" max="200" name="count" value="{{count}}" data-tooltip="Number of terms to display"/>
+  </label>
   <table class="striped">
     <thead>
     <tr>
@@ -8,14 +13,29 @@
     </tr>
   </thead>
   <tbody>
-{% for item in data %}
+{% for item in terms %}
   <tr>
     <th scope="row">{{item[0]}}</th>
-    <td><input type="checkbox" class="cbox" name="pro[]" value="{{item[0]}}" data-id="w{{1+loop.index0}}" /></td>
+    <td><input type="checkbox" {% if item[0] in pos_terms %}checked="checked"{% endif %} class="cbox" name="pro[]" value="{{item[0]}}" data-id="w{{1+loop.index0}}" /></td>
     <td><input type="checkbox" class="cbox" name="con[]" value="{{item[0]}}" data-id="w{{1+loop.index0}}" /></td>
   </tr>
  {% endfor %}
 </table>
 <!--input type="submit" value="Search" /-->
 </form>
-<div id="search-response"></div>
+</details open>
+  <details>
+    <summary>Elastic Query</summary>
+    <pre>
+      {{query}}
+    </pre>
+  </details>
+  <hr />
+  <details open>
+    <summary>Total Number Of Results : {{total}}</summary>
+  {% for item in documents %}
+  <article data-theme="dark">
+      <p>{{item.content}}</p>
+  </article>
+  {% endfor %}
+  </details>

@@ -19,7 +19,7 @@ class util:
 
         final_query   = lambda sub_query : {
                     "from": 0,
-                    "size": 100,
+                    "size": 10,
                     "track_total_hits": True,
                     "query": sub_query
                 }

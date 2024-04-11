@@ -21,10 +21,11 @@ class glove:
         """
         filepath = OUTPUT_PATH+self.caseName+"/model.v3.pkl"
         if Path(filepath).is_file() :
+            print( "found model file!" )
             model = Word2Vec.load(filepath)
             return model
         else :
-            return False
+            return None
 
     def create_model(self, list_list_token):
         """
@@ -44,7 +45,9 @@ class glove:
         self.model.save(path+"/model.v3.pkl")
     
     def tokeniser(self, text):
-        return re.findall(r"\w+", text.lower())
+        tok =  re.findall(r"\w+", text.lower())
+        ## print(tok)
+        return tok
 
 
     def add_sentences(self, sentences):
@@ -52,9 +55,6 @@ class glove:
         This method is the main 
         """
         if isinstance(sentences, types.GeneratorType):
-            if self.model == None:
-                    self.create_model( [ self.tokeniser( next(sentences) ) ]  )
-                    return True
             count = 0
             c_sentences = []
             for sentence in sentences:
@@ -62,6 +62,9 @@ class glove:
                 count = count + 1
                 if count % 10000 == 0 :
                     print(count)
+                    if self.model == None:
+                        self.create_model( c_sentences  )
+                        continue
                     self.model.build_vocab(c_sentences, update=True)
                     self.model.train(c_sentences, total_examples=self.model.corpus_count, epochs=self.model.epochs)
                     c_sentences = []
@@ -75,6 +78,7 @@ class glove:
 
     def get_similar_words(self,words,cnt,neg_words=[], filter_negatives=True):
         wordCounter = Counter()
+        print( "model : ", self.model )
         for word in words:
             embeddings = self.model.wv.most_similar(positive=[word], topn=cnt )
             wordCounter.update( util.tuple2dict( embeddings , 1) )
