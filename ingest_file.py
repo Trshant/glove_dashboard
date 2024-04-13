@@ -23,7 +23,7 @@ while True:
         maxInt = int(maxInt/10)
 
 
-INPUT_PATH="../case_input/"
+INPUT_PATH="./case_input/"
 
 def read_csv_and_yield_one_line( filepath , input_column):    
     with open( filepath , encoding="utf8") as f:

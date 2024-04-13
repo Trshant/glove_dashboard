@@ -308,6 +308,8 @@ pyrightconfig.json
 # End of https://www.toptal.com/developers/gitignore/api/python,pycharm,visualstudiocode
 
 case_data/*
-*.cpython-310.pyc
+case_input/*
+*.pyc
 *.pkl
-*.csv
+*access.log*
+*temp.py

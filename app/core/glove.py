@@ -4,6 +4,11 @@ from pathlib import Path
 import os, types, re
 from collections import Counter
 
+import sys
+from functools import lru_cache
+
+
+
 OUTPUT_PATH="./case_data/"
 
 class glove:
@@ -12,6 +17,7 @@ class glove:
         Constructor method (initializer).
         Initialize instance variables here.
         """
+        sys.setrecursionlimit(15000)
         self.caseName = case_name
         self.model =  self.load_model()
 
@@ -44,10 +50,23 @@ class glove:
         os.makedirs(path, exist_ok=True)
         self.model.save(path+"/model.v3.pkl")
     
+    def tokenise(self, tokens , point=0):
+        if point >= len(tokens):
+            return []
+        if point == 0:
+            return [ tokens[point] ] + self.tokenise(tokens, (point + 1))
+        if point == 1:
+            return [ tokens[point-1]+" "+tokens[point] , tokens[point] ] + self.tokenise(tokens, (point + 1))
+        if point > 1:
+            return [ tokens[point-2]+" "+tokens[point-1]+" "+tokens[point] , tokens[point-1]+" "+tokens[point] , tokens[point] ] + self.tokenise(tokens, (point + 1))
+
+
+    
     def tokeniser(self, text):
         tok =  re.findall(r"\w+", text.lower())
-        ## print(tok)
-        return tok
+        print(len(tok))
+        ngrammed_tok = self.tokenise(tok )
+        return ngrammed_tok
 
 
     def add_sentences(self, sentences):

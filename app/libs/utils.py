@@ -32,7 +32,10 @@ class util:
         return final_query( cover_exp_or( pos_neg )  ) 
 
     @staticmethod
-    def ngram(list_tokens, n=2):
+    def ngram(list_tokens, n=2, r_token=[]):
+        if n == 1:
+            return list_tokens
+        
         ngram_list = zip(*[list_tokens[i:] for i  in range(n) ])
-        return [" ".join(ngram) for ngram in ngram_list  ]
+        return util.ngram(list_tokens, n=(n-1) , r_token=r_token ) +  [" ".join(ngram) for ngram in ngram_list  ]
     
