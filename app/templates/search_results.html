@@ -1,17 +1,16 @@
-<details>
-  <summary>Elastic Query</summary>
-  <pre>
-    {{query}}
-  </pre>
-</details>
 
-<hr />
-
-<details>
-  <summary>Total Number Of Results : {{total}}</summary>
-{% for item in data %}
-<article data-theme="dark">
-    <p>{{item.content}}</p>
-</article>
-{% endfor %}
-</details>
+  <details {% if "2" in form_elements %}open{% endif %}>
+    <summary>Elastic Query</summary>
+    <pre>
+      {{query}}
+    </pre>
+  </details>
+  <hr />
+  <details {% if "3" in form_elements %}open{% endif %}>
+    <summary>Total Number Of Results : {{total}}</summary>
+  {% for item in documents %}
+  <article data-theme="dark">
+      <p>{{item.content}}</p>
+  </article>
+  {% endfor %}
+  </details>

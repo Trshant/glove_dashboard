@@ -17,15 +17,40 @@
         header , footer {
             padding: 2px;
         }
+        tbody {
+            display: block;
+            height: 250px;
+            overflow: auto;
+        }
+        thead, tbody tr {
+            display: table;
+            width: 100%;
+            table-layout: fixed;/* even columns width , fix width of table too*/
+        }
+        thead {
+            width: calc( 100% - 1em )/* scrollbar is average 1em/16px width, remove it from thead width */
+        }
+        tbody {
+            -webkit-transition: all .3s ease-in-out;
+            -moz-transition: all .3s ease-in-out;
+            -o-transition: all .3s ease-in-out;
+            -ms-transition: all .3s ease-in-out;
+            transition: all .3s ease-in-out;
+        }
+
+        tbody:hover { /* Increase length on hover for example */
+            height: 650px; /* new height */
+        }
       </style>
     </head>
   <body>
     <header>Glove-Elastic Tool
     </header>
     <main class="container">
-        <form hx-post="/submit-form" hx-target="#response" > <!--hx-indicator="#indicator"--> 
+        <form hx-post="/analyze_terms" hx-target="#response" > <!--hx-indicator="#indicator"--> 
             <fieldset role="group">
                 <input type="text" placeholder="Starting Term" name="name" />
+                <input type="hidden" value="3" name="open" />
                 <input type="submit" value="Analyze" />
             </fieldset>
         </form>

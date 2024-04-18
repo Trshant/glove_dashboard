@@ -1,9 +1,16 @@
-<details open>
-  <summary>Refine Terms</summary>
-<form hx-post="/submit-search" hx-target="#response" hx-trigger="change delay:1s">
+<details {% if "1" in form_elements %}open{% endif %}>
+  <summary>Refine Terms ({{count}})</summary>
+<form hx-post="/submit-search" hx-target="#search_results" hx-trigger="change delay:1s">
+  <input type="hidden" value="1 3" name="open" />
   <label role="group">
     <input type="range" min="10" max="200" name="count" value="{{count}}" data-tooltip="Number of terms to display"/>
   </label>
+  <div style="display: grid;grid-template-columns: 30px auto;">
+    <div style="writing-mode: vertical-rl; background-color: #02659a; color: white; padding-top:10px;text-align: center;" 
+    hx-post="/submit-glove"
+    hx-trigger="click"
+    hx-target="#response" >Refresh</div>
+    <div>
   <table class="striped">
     <thead>
     <tr>
@@ -12,7 +19,7 @@
       <th scope="col">Negative</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody >
 {% for item in terms %}
   <tr>
     <th scope="row">{{item[0]}}</th>
@@ -21,17 +28,21 @@
   </tr>
  {% endfor %}
 </table>
+</div>
+</div>
 <!--input type="submit" value="Search" /-->
 </form>
-</details open>
-  <details>
+</details>
+<hr />
+<div id="search_results">
+  <details {% if "2" in form_elements %}open{% endif %}>
     <summary>Elastic Query</summary>
     <pre>
       {{query}}
     </pre>
   </details>
   <hr />
-  <details open>
+  <details {% if "3" in form_elements %}open{% endif %}>
     <summary>Total Number Of Results : {{total}}</summary>
   {% for item in documents %}
   <article data-theme="dark">
@@ -39,3 +50,4 @@
   </article>
   {% endfor %}
   </details>
+  </div>

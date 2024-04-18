@@ -28,10 +28,17 @@ app.mount("/static", StaticFiles(directory="./app/static"), name="static")
 
 api_router = APIRouter()
 
-module_elastic = elastic_search( CASE_NAME.lower() )
-module_glove  = glove( CASE_NAME )
-
-logger = get_logger("dsasd")
+class ApplicationMain:
+    def __init__(self):
+        self.module_elastic =  None # elastic_search( CASE_NAME.lower() )
+        self.module_glove  = None # glove( CASE_NAME )
+        self.logger = get_logger("application")
+    def select_docuSet(self, docuset_name):
+        self.module_elastic =  elastic_search( docuset_name.lower() )
+        self.module_glove  = glove( docuset_name )
+        
+application = ApplicationMain()
+application.select_docuSet(CASE_NAME)
 
 """
 urls
@@ -52,14 +59,14 @@ def root(request: Request) -> dict:
     """
     Root GET
     """
-    logger.info("starting the system!")
+    application.logger.info("starting the system!")
     return TEMPLATES.TemplateResponse(
         "index.html",
         {"request": request},
     )
 
 
-@api_router.post("/submit-form", status_code=200)
+@api_router.post("/analyze_terms", status_code=200)
 async def glove_elastic(request: Request) -> dict:
     """
     Root GET
@@ -69,12 +76,13 @@ async def glove_elastic(request: Request) -> dict:
     decoded_body = raw_body.decode('utf-8')
     parsed_data = parse_qs(decoded_body)
 
-    words = parsed_data["name"]
-
+    status, form_elements = util.get_terms( parsed_data["open"][0] )
+    application.logger.debug(form_elements)
+    status , words = util.get_terms( parsed_data["name"][0] )
+    application.logger.debug(words)
     count_terms = 15
     data_to_present = glove_fe(pos_terms=words)
-
-    count, documents , query = elastic_search_fe( [] , [] )
+    count, documents , query = elastic_search_fe( words , [] )
 
 
     form_terms = TEMPLATES.TemplateResponse(
@@ -86,10 +94,11 @@ async def glove_elastic(request: Request) -> dict:
             "documents":documents,
             "count":count_terms,
             "total":count,
-            "query": json.dumps( query , indent=4) 
+            "query": json.dumps( query , indent=4) ,
+            "form_elements": form_elements
          },
     )
-    logger.info("starting the system!")
+    application.logger.info("starting the system!")
     return form_terms
 
 def glove_fe( pos_terms:list=[],count:int=15,neg_terms:list=[],filter_negatives:bool=True ):
@@ -98,7 +107,7 @@ def glove_fe( pos_terms:list=[],count:int=15,neg_terms:list=[],filter_negatives:
     return_data += [ (term , 100) for term in pos_terms ]
     list_to_check += pos_terms + neg_terms
     countdown = count - ( len(pos_terms) + len( neg_terms ) )
-    similar_words = module_glove.get_similar_words(pos_terms, 200 ,neg_terms,filter_negatives)
+    similar_words = application.module_glove.get_similar_words(pos_terms, 200 ,neg_terms,filter_negatives)
     similar_words.reverse()
     while countdown > 0:
         popped_similar_word = similar_words.pop()
@@ -121,7 +130,7 @@ def elastic_search_fe( pos_terms , neg_terms ):
     elastic_query = util.list2elastic( pos_terms , neg_terms )
     ## print(elastic_query)
 
-    return_result = module_elastic.search_index( elastic_query )
+    return_result = application.module_elastic.search_index( elastic_query )
 
     data_to_return = {}
     total_count = return_result["hits"]["total"]["value"]
@@ -129,7 +138,7 @@ def elastic_search_fe( pos_terms , neg_terms ):
     return total_count , data , elastic_query
 
 
-@api_router.post("/submit-search", status_code=200)
+@api_router.post("/submit-glove", status_code=200)
 async def elastic(request: Request):
     """
     Root GET
@@ -139,11 +148,13 @@ async def elastic(request: Request):
     raw_body = await request.body()
     decoded_body = raw_body.decode('utf-8')
     parsed_data = parse_qs(decoded_body)
+
+    status, form_elements = util.get_terms( parsed_data["open"][0] )
+    application.logger.debug(form_elements)
     
     pos_terms = parsed_data.get("pro[]" , [])
     neg_terms = parsed_data.get("con[]" , [])
     count_terms = int( parsed_data.get("count" , 0)[0])
-    print(count_terms)
 
     data_to_present = glove_fe(pos_terms=pos_terms,count=count_terms, neg_terms=neg_terms)
 
@@ -158,7 +169,47 @@ async def elastic(request: Request):
             "documents":documents,
             "count":count_terms,
             "total":count,
-            "query": json.dumps( query , indent=4) 
+            "query": json.dumps( query , indent=4) ,
+            "form_elements": form_elements
+         },
+    )
+    return form_terms
+
+
+
+@api_router.post("/submit-search", status_code=200)
+async def elastic(request: Request):
+    """
+    Root GET
+    """
+    
+
+    raw_body = await request.body()
+    decoded_body = raw_body.decode('utf-8')
+    parsed_data = parse_qs(decoded_body)
+
+    status, form_elements = util.get_terms( parsed_data["open"][0] )
+    application.logger.debug(form_elements)
+    
+    pos_terms = parsed_data.get("pro[]" , [])
+    neg_terms = parsed_data.get("con[]" , [])
+    count_terms = int( parsed_data.get("count" , 0)[0])
+
+    data_to_present = glove_fe(pos_terms=pos_terms,count=count_terms, neg_terms=neg_terms)
+
+    count, documents , query = elastic_search_fe( pos_terms , neg_terms )
+
+    form_terms = TEMPLATES.TemplateResponse(
+        "search_results.html",
+        {
+            "request": request, 
+            "terms":data_to_present , 
+            "pos_terms":pos_terms,
+            "documents":documents,
+            "count":count_terms,
+            "total":count,
+            "query": json.dumps( query , indent=4) ,
+            "form_elements": form_elements
          },
     )
     return form_terms

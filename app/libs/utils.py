@@ -1,3 +1,5 @@
+import re 
+
 class util:
     def __init__(self):
         pass
@@ -38,4 +40,17 @@ class util:
         
         ngram_list = zip(*[list_tokens[i:] for i  in range(n) ])
         return util.ngram(list_tokens, n=(n-1) , r_token=r_token ) +  [" ".join(ngram) for ngram in ngram_list  ]
+    
+    @staticmethod
+    def get_terms(my_string):
+        pattern = r'"([^"]+)"'  # This pattern captures text within double quotes
+        # Search for the pattern in the string
+        match = re.findall(pattern, my_string)
+        if match:
+            extracted_substring = match
+            my_string = re.sub(pattern, "", my_string)
+            return True ,  my_string.strip().split() + match 
+        else:
+            return True , my_string.strip().split()
+
     
