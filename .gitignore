@@ -116,7 +116,7 @@ fabric.properties
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
-__pycache__/
+*/__pycache__/*
 *.py[cod]
 *$py.class
 
@@ -313,3 +313,6 @@ case_input/*
 *.pkl
 *access.log*
 *temp.py
+elastic-data/*
+files/*
+*static/uploads/*

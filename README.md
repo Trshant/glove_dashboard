@@ -9,3 +9,7 @@
 To stop the server, press CTRL+C
 
 If you get stuck, checkout the [troubleshooting readme](../troubleshooting/README.md)
+
+
+16 OCT
+Finished the main of upload. need to check adding to elastic and glove next.
