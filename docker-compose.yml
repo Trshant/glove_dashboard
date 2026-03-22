@@ -1,0 +1,35 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8001:8001"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - ES_ADDR=http://elasticsearch:9200
+      - ES_USER=elastic
+      - ES_PASS=JqdGMYPXDGbkFIMLX
+      - ES_INDEX=imdb
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - ELASTIC_PASSWORD=JqdGMYPXDGbkFIMLX
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:JqdGMYPXDGbkFIMLX http://localhost:9200/_cluster/health | grep -q '\"status\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  es_data:

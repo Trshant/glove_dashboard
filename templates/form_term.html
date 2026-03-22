@@ -1,0 +1,22 @@
+<form hx-post="/submit-search" hx-target="#search_results" hx-trigger="change delay:1s">
+<table role="grid">
+    <thead>
+        <tr>
+            <th>Term</th>
+            <th>Score</th>
+            <th>Positive</th>
+            <th>Negative</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Data}}
+        <tr>
+            <td>{{.Word}}</td>
+            <td>{{printf "%.4f" .Score}}</td>
+            <td><input type="checkbox" class="cbox" name="pro[]" value="{{.Word}}" data-id="w{{.Index}}"></td>
+            <td><input type="checkbox" class="cbox" name="con[]" value="{{.Word}}" data-id="w{{.Index}}"></td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+</form>
