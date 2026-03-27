@@ -7,29 +7,20 @@ A web application that combines Word2Vec word embeddings with Elasticsearch full
 - **Go 1.22+**
 - **Docker** (for Elasticsearch)
 
-## Quick Start
+## Setup from Scratch
+
+Follow these steps in order to get a working system from a fresh clone.
+
+### Step 1: Start Elasticsearch
 
 ```bash
-# 1. Start Elasticsearch
 docker compose up -d elasticsearch
-
-# 2. Wait for ES to be healthy (~30 seconds)
-docker compose ps   # should show "healthy"
-
-# 3. Run the server
-go run cmd/server/main.go
-
-# 4. Open http://localhost:8001
 ```
 
-## Setup in Detail
-
-### 1. Start Elasticsearch
-
-The project uses Elasticsearch 8.12 with security enabled. Docker Compose handles everything:
+Wait for it to be healthy (~30 seconds):
 
 ```bash
-docker compose up -d elasticsearch
+docker compose ps   # status should show "healthy"
 ```
 
 Default credentials (configured in `docker-compose.yml`):
@@ -37,22 +28,39 @@ Default credentials (configured in `docker-compose.yml`):
 - **Password**: `JqdGMYPXDGbkFIMLX`
 - **Address**: `http://localhost:9200`
 
-### 2. Prepare a Model
+### Step 2: Load your data into Elasticsearch
 
-The server needs a trained Word2Vec model in a model directory. You have three options:
+The search corpus needs to be indexed into Elasticsearch before the app can return results. The `loadcsv` tool reads a CSV file with a `review` column and bulk-inserts every row into ES:
 
-#### Option A: Use the pre-trained IMDB model (included)
+```bash
+go run cmd/loadcsv/main.go --csv "case_data/IMDB/IMDB Dataset.csv"
+```
 
-The repo ships with a pre-trained model at `case_data/IMDB/`. Just start the server — it will load automatically.
+This loads all 50,000 IMDB reviews into the `imdb` index. It takes about 6 seconds.
 
-#### Option B: Train a new model from a corpus
+To load into a different index:
 
-Prepare a text file with one sentence per line, then:
+```bash
+go run cmd/loadcsv/main.go --csv my_data.csv --es-index myindex
+```
+
+| Flag | Env Var | Default | Description |
+|------|---------|---------|-------------|
+| `--csv` | | (required) | Path to CSV file. Must have a `review` column |
+| `--es-index` | `ES_INDEX` | `imdb` | Elasticsearch index name |
+| `--es-addr` | `ES_ADDR` | `http://localhost:9200` | Elasticsearch URL |
+| `--es-user` | `ES_USER` | `elastic` | ES username |
+| `--es-pass` | `ES_PASS` | `JqdGMYPXDGbkFIMLX` | ES password |
+| `--batch` | | `500` | Bulk insert batch size |
+
+### Step 3: Train the Word2Vec model
+
+The server needs word vectors to find semantically similar words. Train a model from your corpus (one sentence per line in a text file):
 
 ```bash
 go run cmd/train/main.go create \
   --input corpus.txt \
-  --output case_data/MyModel \
+  --output case_data/IMDB \
   --min-count 10 \
   --size 100 \
   --window 5 \
@@ -70,32 +78,26 @@ go run cmd/train/main.go create \
 | `--epochs` | 5 | Number of training passes over the corpus |
 | `--workers` | 4 | Parallel training threads |
 
-#### Option C: Import an existing word2vec text file
-
-If you have vectors in the standard word2vec text format (first line: `vocab_size dimensions`, then `word float float ...` per line):
-
-```bash
-go run cmd/train/main.go import \
-  --input vectors.txt \
-  --output case_data/MyModel
-```
-
-If you also have a vocab frequency JSON file (`{"word": count, ...}`), pass it with `--freq` to enable accurate incremental training later:
+If you already have vectors in standard word2vec text format, you can import them instead:
 
 ```bash
 go run cmd/train/main.go import \
   --input vectors.txt \
   --freq vocab_freq.json \
-  --output case_data/MyModel
+  --output case_data/IMDB
 ```
 
-### 3. Run the Server
+The repo ships with a pre-trained IMDB model in `case_data/IMDB/` — if you just want to try the app, skip this step.
+
+### Step 4: Start the server
 
 ```bash
 go run cmd/server/main.go
 ```
 
-The server accepts these flags (all have sensible defaults):
+Open **http://localhost:8001** in your browser.
+
+Type a word (e.g. "good"), click **Analyze**, check some words as positive or negative, and search results will appear from the IMDB corpus.
 
 | Flag | Env Var | Default | Description |
 |------|---------|---------|-------------|
@@ -106,21 +108,48 @@ The server accepts these flags (all have sensible defaults):
 | `--es-pass` | `ES_PASS` | `JqdGMYPXDGbkFIMLX` | ES password |
 | `--es-index` | `ES_INDEX` | `imdb` | ES index name |
 
-To use a different model:
+---
 
-```bash
-go run cmd/server/main.go --model case_data/MyModel --es-index myindex
+## Adding a New Dataset
+
+You can use this system with any text corpus, not just IMDB. Here's how to set up a second dataset alongside the existing one.
+
+### 1. Prepare your CSV
+
+Your CSV needs a `review` column (the text content to be searched). Place it somewhere convenient:
+
+```
+case_data/MyCorpus/data.csv
 ```
 
-Environment variables work too (useful for Docker):
+### 2. Load it into a new ES index
 
 ```bash
-MODEL_DIR=case_data/MyModel ES_INDEX=myindex go run cmd/server/main.go
+go run cmd/loadcsv/main.go --csv case_data/MyCorpus/data.csv --es-index mycorpus
 ```
 
-## Adding New Data to an Existing Model (Incremental Training)
+### 3. Train vectors on the same text
 
-One of the key features is the ability to add new sentences to an already-trained model without retraining from scratch. New words are added to the vocabulary, weight matrices are extended, and training runs on just the new sentences:
+Extract one sentence per line from your corpus into a plain text file, then train:
+
+```bash
+go run cmd/train/main.go create \
+  --input case_data/MyCorpus/sentences.txt \
+  --output case_data/MyCorpus \
+  --min-count 10
+```
+
+### 4. Run the server pointing at the new dataset
+
+```bash
+go run cmd/server/main.go --model case_data/MyCorpus --es-index mycorpus
+```
+
+---
+
+## Incremental Training
+
+You can add new sentences to an already-trained model without retraining from scratch. New words are added to the vocabulary, weight matrices are extended, and training runs on just the new sentences:
 
 ```bash
 go run cmd/train/main.go add \
@@ -131,6 +160,14 @@ go run cmd/train/main.go add \
 The input file should have one sentence per line. The model is updated in place.
 
 This is useful when your corpus grows over time — for example, indexing new reviews each week. Existing word vectors are refined and new words are learned without a full retrain.
+
+Don't forget to also load the new text into Elasticsearch so it appears in search results:
+
+```bash
+go run cmd/loadcsv/main.go --csv new_reviews.csv
+```
+
+---
 
 ## Running with Docker Compose (Full Stack)
 
@@ -162,6 +199,7 @@ go test ./...
 cmd/
   server/main.go         Web server entry point
   train/main.go          CLI for training and importing models
+  loadcsv/main.go        CLI for loading CSV data into Elasticsearch
 internal/
   word2vec/              Custom Word2Vec (CBOW + negative sampling)
     model.go             Model struct, save/load (binary + text formats)
@@ -169,20 +207,20 @@ internal/
     vocab.go             Vocabulary management with incremental extension
     inference.go         Cosine similarity search and aggregation
     tokenizer.go         \w+ lowercase tokenizer
-  elastic/client.go      Elasticsearch client (index, search)
+  elastic/client.go      Elasticsearch client (index, bulk insert, search)
   query/builder.go       Bool query builder from positive/negative terms
   handlers/routes.go     HTTP route handlers
 templates/               HTML templates (Go html/template + HTMX)
-case_data/               Model data directories
+case_data/               Model data and corpus directories
 ```
 
 ## How It Works
 
-1. You type a word (e.g. "good") into the search box
+1. You type a word (e.g. "good") into the search box and click **Analyze**
 2. The server finds the 15 most semantically similar words using cosine similarity over Word2Vec embeddings
 3. You check words as **positive** (include in search) or **negative** (exclude)
-4. The app builds an Elasticsearch bool query combining your selections and searches the IMDB corpus
-5. Matching reviews are displayed
+4. The app builds an Elasticsearch bool query combining your selections and searches the corpus
+5. Matching documents are displayed
 
 The frontend uses HTMX for interactivity — no JavaScript framework needed. Checkbox changes trigger a search after a 1-second debounce.
 

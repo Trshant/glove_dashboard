@@ -1,22 +1,20 @@
-<form hx-post="/submit-search" hx-target="#search_results" hx-trigger="change delay:1s">
-<table role="grid">
+<form hx-post="/submit-search" hx-target="#search-response" hx-trigger="change delay:1s">
+  <table class="striped">
     <thead>
-        <tr>
-            <th>Term</th>
-            <th>Score</th>
-            <th>Positive</th>
-            <th>Negative</th>
-        </tr>
-    </thead>
-    <tbody>
-        {{range .Data}}
-        <tr>
-            <td>{{.Word}}</td>
-            <td>{{printf "%.4f" .Score}}</td>
-            <td><input type="checkbox" class="cbox" name="pro[]" value="{{.Word}}" data-id="w{{.Index}}"></td>
-            <td><input type="checkbox" class="cbox" name="con[]" value="{{.Word}}" data-id="w{{.Index}}"></td>
-        </tr>
-        {{end}}
-    </tbody>
+    <tr>
+      <th scope="col">Term</th>
+      <th scope="col">Positive</th>
+      <th scope="col">Negative</th>
+    </tr>
+  </thead>
+  <tbody>
+{{range .Data}}
+  <tr>
+    <th scope="row">{{.Word}}</th>
+    <td><input type="checkbox" class="cbox" name="pro[]" value="{{.Word}}" data-id="w{{.Index}}"></td>
+    <td><input type="checkbox" class="cbox" name="con[]" value="{{.Word}}" data-id="w{{.Index}}"></td>
+  </tr>
+{{end}}
 </table>
 </form>
+<div id="search-response"></div>

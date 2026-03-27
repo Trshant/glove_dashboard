@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"os"
@@ -317,7 +318,7 @@ func loadBinary(path string) (*Model, error) {
 		return nil, err
 	}
 	configData := make([]byte, configLen)
-	if _, err := r.Read(configData); err != nil {
+	if _, err := io.ReadFull(r, configData); err != nil {
 		return nil, err
 	}
 	var config TrainConfig
@@ -338,7 +339,7 @@ func loadBinary(path string) (*Model, error) {
 			return nil, err
 		}
 		wordBytes := make([]byte, wordLen)
-		if _, err := r.Read(wordBytes); err != nil {
+		if _, err := io.ReadFull(r, wordBytes); err != nil {
 			return nil, err
 		}
 		var freq int32

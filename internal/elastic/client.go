@@ -132,21 +132,71 @@ func (c *Client) InsertDocument(content string) error {
 	return nil
 }
 
-// InsertDocuments bulk-indexes documents from a channel.
-func (c *Client) InsertDocuments(docs <-chan string) error {
-	for content := range docs {
-		if err := c.InsertDocument(content); err != nil {
-			return err
+// BulkInsert indexes documents in batches for performance.
+// onProgress is called after each batch with the total documents indexed so far.
+func (c *Client) BulkInsert(docs []string, batchSize int, onProgress func(int)) error {
+	if batchSize <= 0 {
+		batchSize = 500
+	}
+
+	for i := 0; i < len(docs); i += batchSize {
+		end := i + batchSize
+		if end > len(docs) {
+			end = len(docs)
+		}
+		batch := docs[i:end]
+
+		var buf bytes.Buffer
+		for _, content := range batch {
+			// Action line
+			buf.WriteString(`{"index":{}}`)
+			buf.WriteByte('\n')
+			// Document line
+			doc, _ := json.Marshal(map[string]string{"content": content})
+			buf.Write(doc)
+			buf.WriteByte('\n')
+		}
+
+		res, err := c.es.Bulk(bytes.NewReader(buf.Bytes()),
+			c.es.Bulk.WithIndex(c.indexName))
+		if err != nil {
+			return fmt.Errorf("bulk insert: %w", err)
+		}
+		res.Body.Close()
+
+		if res.IsError() {
+			return fmt.Errorf("bulk insert error: %s", res.Status())
+		}
+
+		if onProgress != nil {
+			onProgress(end)
 		}
 	}
 
-	// Refresh index
+	// Final refresh
 	res, err := c.es.Indices.Refresh(c.es.Indices.Refresh.WithIndex(c.indexName))
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
 	return nil
+}
+
+// DocCount returns the number of documents in the index.
+func (c *Client) DocCount() (int, error) {
+	res, err := c.es.Count(c.es.Count.WithIndex(c.indexName))
+	if err != nil {
+		return 0, err
+	}
+	defer res.Body.Close()
+
+	var result struct {
+		Count int `json:"count"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return 0, err
+	}
+	return result.Count, nil
 }
 
 // Search executes a search query and returns parsed results.

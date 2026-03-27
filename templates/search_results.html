@@ -1,10 +1,17 @@
 <details>
-    <summary>Elasticsearch Query</summary>
-    <pre>{{.Query}}</pre>
+  <summary>Elastic Query</summary>
+  <pre>
+    {{.Query}}
+  </pre>
 </details>
-<p>Total results: <strong>{{.Total}}</strong></p>
+
+<hr />
+
+<details>
+  <summary>Total Number Of Results : {{.Total}}</summary>
 {{range .Data}}
 <article data-theme="dark">
-    {{.Content}}
+    <p>{{.Content}}</p>
 </article>
 {{end}}
+</details>
