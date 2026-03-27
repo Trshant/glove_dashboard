@@ -55,28 +55,38 @@ go run cmd/loadcsv/main.go --csv my_data.csv --es-index myindex
 
 ### Step 3: Train the Word2Vec model
 
-The server needs word vectors to find semantically similar words. Train a model from your corpus (one sentence per line in a text file):
+The server needs word vectors to find semantically similar words. The easiest way is to train directly from the data you just loaded into Elasticsearch:
+
+```bash
+go run cmd/train/main.go from-es \
+  --es-index imdb \
+  --output case_data/IMDB \
+  --min-count 10
+```
+
+This scrolls through all documents in the index, tokenizes them, and trains a model. No intermediate file needed.
+
+Alternatively, you can train from a local text file (one sentence per line):
 
 ```bash
 go run cmd/train/main.go create \
   --input corpus.txt \
   --output case_data/IMDB \
-  --min-count 10 \
-  --size 100 \
-  --window 5 \
-  --epochs 5 \
-  --workers 4
+  --min-count 10
 ```
+
+Both commands accept the same training flags:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--input` | (required) | Path to corpus file, one sentence per line |
 | `--output` | (required) | Directory to save the model |
 | `--min-count` | 10 | Ignore words appearing fewer than this many times |
 | `--size` | 100 | Dimensionality of word vectors |
 | `--window` | 5 | Context window size (words on each side) |
 | `--epochs` | 5 | Number of training passes over the corpus |
 | `--workers` | 4 | Parallel training threads |
+
+The `from-es` command also accepts `--es-addr`, `--es-user`, `--es-pass`, and `--es-index` (same defaults as the server).
 
 If you already have vectors in standard word2vec text format, you can import them instead:
 
@@ -128,13 +138,11 @@ case_data/MyCorpus/data.csv
 go run cmd/loadcsv/main.go --csv case_data/MyCorpus/data.csv --es-index mycorpus
 ```
 
-### 3. Train vectors on the same text
-
-Extract one sentence per line from your corpus into a plain text file, then train:
+### 3. Train vectors from the data you just loaded
 
 ```bash
-go run cmd/train/main.go create \
-  --input case_data/MyCorpus/sentences.txt \
+go run cmd/train/main.go from-es \
+  --es-index mycorpus \
   --output case_data/MyCorpus \
   --min-count 10
 ```
