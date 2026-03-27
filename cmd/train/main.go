@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 
+	"glove/internal/elastic"
 	"glove/internal/word2vec"
 )
 
@@ -26,6 +27,8 @@ func main() {
 		cmdAdd()
 	case "import":
 		cmdImport()
+	case "from-es":
+		cmdFromES()
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
 		printUsage()
@@ -37,12 +40,14 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, `Usage: train <command> [options]
 
 Commands:
-  create    Create a new model from a corpus
+  create    Create a new model from a corpus file
+  from-es   Create a new model from data already in Elasticsearch
   add       Add sentences to an existing model (incremental training)
   import    Import from word2vec text format (one-time migration)
 
 Examples:
   train create --input corpus.txt --output case_data/IMDB --min-count 10
+  train from-es --es-index imdb --output case_data/IMDB
   train add --model case_data/IMDB --input new_sentences.txt
   train import --input case_data/IMDB/vectors.txt --output case_data/IMDB
 `)
@@ -155,6 +160,84 @@ func cmdImport() {
 		log.Fatalf("Saving model: %v", err)
 	}
 	log.Printf("Model saved to %s", *output)
+}
+
+func cmdFromES() {
+	fs := flag.NewFlagSet("from-es", flag.ExitOnError)
+	output := fs.String("output", "", "Output model directory")
+	esAddr := fs.String("es-addr", envOrDefault("ES_ADDR", "http://localhost:9200"), "Elasticsearch address")
+	esUser := fs.String("es-user", envOrDefault("ES_USER", "elastic"), "Elasticsearch username")
+	esPass := fs.String("es-pass", envOrDefault("ES_PASS", "JqdGMYPXDGbkFIMLX"), "Elasticsearch password")
+	esIndex := fs.String("es-index", envOrDefault("ES_INDEX", "imdb"), "Elasticsearch index name")
+	minCount := fs.Int("min-count", 10, "Minimum word frequency")
+	vecSize := fs.Int("size", 100, "Vector dimensionality")
+	window := fs.Int("window", 5, "Context window size")
+	epochs := fs.Int("epochs", 5, "Training epochs")
+	workers := fs.Int("workers", 4, "Number of parallel workers")
+	fs.Parse(os.Args[1:])
+
+	if *output == "" {
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	// Connect to ES
+	log.Printf("Connecting to Elasticsearch at %s (index: %s)...", *esAddr, *esIndex)
+	es, err := elastic.NewClient(*esAddr, *esUser, *esPass, *esIndex)
+	if err != nil {
+		log.Fatalf("ES connection: %v", err)
+	}
+
+	count, _ := es.DocCount()
+	log.Printf("Index %q has %d documents", *esIndex, count)
+
+	// Scroll all documents and tokenize
+	log.Println("Reading documents from Elasticsearch...")
+	var sentences [][]string
+	total := 0
+	err = es.ScrollAll(1000, func(docs []string) {
+		for _, doc := range docs {
+			tokens := word2vec.Tokenize(doc)
+			if len(tokens) > 0 {
+				sentences = append(sentences, tokens)
+			}
+		}
+		total += len(docs)
+		log.Printf("  fetched %d / %d documents", total, count)
+	})
+	if err != nil {
+		log.Fatalf("Scrolling ES: %v", err)
+	}
+	log.Printf("Tokenized %d sentences from %d documents", len(sentences), total)
+
+	// Train
+	config := word2vec.TrainConfig{
+		VectorSize: *vecSize,
+		Window:     *window,
+		MinCount:   *minCount,
+		Workers:    *workers,
+		Epochs:     *epochs,
+		Alpha:      0.025,
+		MinAlpha:   0.0001,
+		NegSamples: 5,
+	}
+
+	model := word2vec.NewModel(config)
+	log.Println("Training model...")
+	model.CreateAndTrain(sentences)
+	log.Printf("Vocabulary size: %d", model.Vocab.Size())
+
+	if err := model.SaveModel(*output); err != nil {
+		log.Fatalf("Saving model: %v", err)
+	}
+	log.Printf("Model saved to %s", *output)
+}
+
+func envOrDefault(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
 }
 
 // readSentences reads a file with one sentence per line, tokenizing each.

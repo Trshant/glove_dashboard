@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -197,6 +198,110 @@ func (c *Client) DocCount() (int, error) {
 		return 0, err
 	}
 	return result.Count, nil
+}
+
+// ScrollAll retrieves all documents from the index using the scroll API.
+// onBatch is called with each batch of content strings.
+func (c *Client) ScrollAll(batchSize int, onBatch func(docs []string)) error {
+	if batchSize <= 0 {
+		batchSize = 1000
+	}
+
+	query := map[string]any{
+		"query": map[string]any{"match_all": map[string]any{}},
+		"size":  batchSize,
+		"_source": []string{"content"},
+	}
+	body, err := json.Marshal(query)
+	if err != nil {
+		return err
+	}
+
+	// Initial search with scroll
+	res, err := c.es.Search(
+		c.es.Search.WithIndex(c.indexName),
+		c.es.Search.WithBody(bytes.NewReader(body)),
+		c.es.Search.WithScroll(scrollTimeout),
+	)
+	if err != nil {
+		return fmt.Errorf("scroll init: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		b, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("scroll init error: %s", b)
+	}
+
+	var scrollResult scrollResponse
+	if err := json.NewDecoder(res.Body).Decode(&scrollResult); err != nil {
+		return fmt.Errorf("decoding scroll response: %w", err)
+	}
+
+	for {
+		docs := extractContent(scrollResult.Hits.Hits)
+		if len(docs) == 0 {
+			break
+		}
+		onBatch(docs)
+
+		// Fetch next page
+		scrollBody, _ := json.Marshal(map[string]string{
+			"scroll":    "2m",
+			"scroll_id": scrollResult.ScrollID,
+		})
+		res, err := c.es.Scroll(
+			c.es.Scroll.WithBody(bytes.NewReader(scrollBody)),
+		)
+		if err != nil {
+			return fmt.Errorf("scroll: %w", err)
+		}
+
+		scrollResult = scrollResponse{}
+		if err := json.NewDecoder(res.Body).Decode(&scrollResult); err != nil {
+			res.Body.Close()
+			return fmt.Errorf("decoding scroll page: %w", err)
+		}
+		res.Body.Close()
+	}
+
+	// Clear scroll
+	if scrollResult.ScrollID != "" {
+		clearBody, _ := json.Marshal(map[string][]string{
+			"scroll_id": {scrollResult.ScrollID},
+		})
+		res, err := c.es.ClearScroll(
+			c.es.ClearScroll.WithBody(bytes.NewReader(clearBody)),
+		)
+		if err == nil {
+			res.Body.Close()
+		}
+	}
+
+	return nil
+}
+
+const scrollTimeout = 2 * time.Minute
+
+type scrollResponse struct {
+	ScrollID string `json:"_scroll_id"`
+	Hits     struct {
+		Hits []struct {
+			Source map[string]any `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+func extractContent(hits []struct {
+	Source map[string]any `json:"_source"`
+}) []string {
+	var docs []string
+	for _, h := range hits {
+		if c, ok := h.Source["content"].(string); ok && c != "" {
+			docs = append(docs, c)
+		}
+	}
+	return docs
 }
 
 // Search executes a search query and returns parsed results.
